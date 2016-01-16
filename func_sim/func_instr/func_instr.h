@@ -1,161 +1,105 @@
-/**
- * func_instr.h - Header of module implementing the MIPS disassembler
- * @author Roman Zavodskikh <roman.zavodskikh@phystech.edu>
- * Copyright 2015 uArchSim iLab project
+/*
+ * func_instr.h - instruction parser for mips
+ * @author Pavel Kryukov pavel.kryukov@phystech.edu
+ * Copyright 2014 MIPT-MIPS
  */
 
-//protection from multi-include
-#ifndef FUNC_INSTR__FUNC_INSTR_H
-#define FUNC_INSTR__FUNC_INSTR_H
+
+#ifndef FUNC_INSTR_H
+#define FUNC_INSTR_H
 
 // Generic C++
 #include <string>
+#include <cassert>
 
-// Generic C
-
-// uArchSim modules
+// MIPT-MIPS modules
 #include <types.h>
-
-using namespace std;
+#include <elf_parser.h>
 
 class FuncInstr
 {
+    public:
+        FuncInstr( uint32 bytes);
+        std::string Dump( std::string indent = " ") const;
+
     private:
-        enum FormatType
+        enum Format
         {
             FORMAT_R,
             FORMAT_I,
             FORMAT_J,
-            NO_FORMAT
+            FORMAT_UNKNOWN
         } format;
 
-        enum Type
+        enum OperationType
         {
-            ADD = 0,
-            ADDU,
-            SUB,
-            SUBU,
-            ADDI,
-            ADDIU,
-            MULT,
-            MULTU,
-            DIV,
-            DIVU,
-            MFHI,
-            MTHI,
-            MFLO,
-            MTLO,
-            SLL,
-            SRL,
-            SRA,
-            SLLV,
-            SRLV,
-            SRAV,
-            LUI,
-            SLT,
-            SLTU,
-            SLTI,
-            SLTIU,
-            AND,
-            OR,
-            XOR,
-            NOR,
-            ANDI,
-            ORI,
-            XORI,
-            BEQ,
-            BNE,
-            BLEZ,
-            BGTZ,
-            J,
-            JAL, JR,
-            JALR,
-            LB,
-            LH,
-            LW,
-            LBU,
-            LHU,
-            SB,
-            SH,
-            SW,
-            SYSCALL,
-            BREAK,
-            TRAP,
-            NO_TYPE
-        } type;
+            OUT_R_ARITHM,
+            OUT_R_SHAMT,
+            OUT_R_JUMP,
+            OUT_R_SPECIAL,
+            OUT_I_ARITHM,
+            OUT_I_BRANCH,
+            OUT_I_LOAD,
+            OUT_I_STORE,
+            OUT_J_JUMP,
+            OUT_J_SPECIAL
+        } operation;
 
-        enum Register
-        {
-            ZERO = 0, AT,
-            V0, V1,
-            A0, A1, A2, A3,
-            T0, T1, T2, T3, T4, T5, T6, T7,
-            S0, S1, S2, S3, S4, S5, S6, S7,
-            T8, T9, K0, K1, GP, SP, S8, RA, NUM_OF_REGS
-        };
-
-        struct ISAEntry
-        {
-            const char* name;
-
-            uint8 opcode;
-            uint8 func;
-
-            FuncInstr::FormatType format;
-            FuncInstr::Type type;
-        };
-        static const ISAEntry isaTable[];
-
-        union
+        union _instr
         {
             struct
             {
-                unsigned imm:16;
-                unsigned rt:5;
-                unsigned rs:5;
-                unsigned op:6;
-            } asI;
-            struct
-            {
-                unsigned funct:6;
-                unsigned shamt:5;
-                unsigned rd:5;
-                unsigned rt:5;
-                unsigned rs:5;
-                unsigned op:6;
+                unsigned funct  :6;
+                unsigned shamt  :5;
+                unsigned rd     :5;
+                unsigned rt     :5;
+                unsigned rs     :5;
+                unsigned opcode :6;
             } asR;
             struct
             {
-                unsigned offset:26;
-                unsigned op:6;
+                unsigned imm    :16;
+                unsigned rt     :5;
+                unsigned rs     :5;
+                unsigned opcode :6;
+            } asI;
+            struct
+            {
+                unsigned imm    :26;
+                unsigned opcode :6;
             } asJ;
             uint32 raw;
-        } bytes;
 
-        char* cmd_name;
-        string full_cmd_name;
+            _instr(uint32 bytes) {
+                 raw = bytes;
+            }
+        } instr;
 
-        void initFormat( uint32 bytes);
-        void parseR( uint32 bytes);
-        void parseI( uint32 bytes);
-        void parseJ( uint32 bytes);
+        struct ISAEntry
+        {
+            std::string name;
 
-        bool usesTwoOperandsAndOffset( Type type) const;
-        bool usesTwoRegOperandsAndOneImm( Type type) const;
-        bool usesThreeRegOperands( Type type) const;
-        bool usesTwoRegOperands( Type type) const;
-        bool usesOneRegOperand( Type type) const;
-        bool usesOneRegOperandAndOneImm( Type type) const;
+            uint8 opcode;
+            uint8 funct;
 
-        string asReg( unsigned char reg) const;
-        string asRegOff( unsigned char reg, uint16 offset) const;
-        string strFormat( FormatType format) const;
-    public:
-        FuncInstr( uint32 bytes);
-        ~FuncInstr();
-        string Dump( std::string indent = " ") const;
+            Format format;
+            OperationType operation;
+        };
+        uint32 isaNum;
+
+        static const ISAEntry isaTable[];
+        static const uint32 isaTableSize;
+        static const char *regTable[];
+
+        std::string disasm;
+                                                               
+        void initFormat();
+        void initR();
+        void initI();
+        void initJ();
+        void initUnknown();
 };
 
 std::ostream& operator<<( std::ostream& out, const FuncInstr& instr);
 
-#endif //FUNC_INSTR__FUNC_INSTR_H
+#endif //FUNC_INSTR_H
