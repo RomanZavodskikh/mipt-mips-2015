@@ -257,11 +257,6 @@ int FuncInstr::get_src2_num_index() const
         case OUT_R_ARITHM:
             return instr.asR.rt;
             break;
-        case OUT_R_SHAMT:
-            return instr.asR.shamt;
-            break;
-        case OUT_I_ARITHM:
-            return instr.asI.imm;
         case OUT_I_BRANCH:
         case OUT_I_STORE:
             return instr.asI.rt;

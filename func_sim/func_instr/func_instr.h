@@ -31,6 +31,7 @@ class FuncInstr
 
         bool isLoad() const { return operation==OUT_I_LOAD;}
         bool isStore() const { return operation==OUT_I_STORE;}
+        bool isRJump() const { return operation==OUT_R_JUMP; }
 
         uint32 v_src1;
         uint32 v_src2;
@@ -141,11 +142,11 @@ class FuncInstr
         void mthi() { HI = v_src1; }
         void mflo() { v_dst = LO; }
         void mtlo() { LO = v_src1; }
-        void sll()  { v_dst = v_src1 << instr.asI.imm; }
+        void sll()  { v_dst = v_src1 << instr.asR.shamt; }
         void sllv() { v_dst = v_src1 << v_src2; }
-        void srl()  { v_dst = v_src1 >> instr.asI.imm; }
+        void srl()  { v_dst = v_src1 >> instr.asR.shamt; }
         void srlv() { v_dst = v_src1 >> v_src2; }
-        void sra()  { v_dst = (int32)v_src1 >> (int32)instr.asI.imm; }
+        void sra()  { v_dst = (int32)v_src1 >> (int32)instr.asR.shamt; }
         void srav() { v_dst = (int32)v_src1 >> (int32)v_src2; }
         void slt()  { v_dst = v_src1 < v_src2; }
         void slti() { v_dst = v_src1 < instr.asI.imm; }
@@ -167,13 +168,7 @@ class FuncInstr
         void jr()  { }
         void jal()   { v_dst = PC + 4; }
         void jalr() { v_dst = PC + 4; }
-        void load() { mem_addr = v_src1 + instr.asI.imm;
-                        std::cout << "---imm---" << instr.asI.imm
-                            << std::endl;
-                        std::cout << "---src1---" << v_src1
-                            << std::endl;
-                        std::cout << "---mem_addr---" << mem_addr
-                            << std::endl;   }
+        void load() { mem_addr = v_src1 + instr.asI.imm; }
         void lb()   { this->load(); mem_bytes = 1; mem_sign = true; }
         void lh()   { this->load(); mem_bytes = 2; mem_sign = true; }
         void lw()   { this->load(); mem_bytes = 4; mem_sign = true; }

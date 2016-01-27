@@ -24,6 +24,7 @@ int main (int argc, char* argv[])
         FuncMemory func_mem( file_name, 64, 15, 32);
         
         // print content of the memory
+        std::cout << func_mem.dump();
  
     } else if ( argc - 1 > num_of_args)
     {

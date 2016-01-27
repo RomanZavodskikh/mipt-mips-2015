@@ -10,7 +10,8 @@
 #include <func_sim.h>
 #include <func_memory.h>
 
-MIPS::MIPS( void)
+MIPS::MIPS( void):
+    HI(0), LO(0)
 {
     rf = new RF;
 }
@@ -27,19 +28,33 @@ void MIPS::run ( const string& tr, uint instr_to_run)
     for ( uint i = 0; i < instr_to_run; ++i)
     {
         //Fetch
+        std::cout << 'F' << std::endl;
+        std::cout << "--PC--|" << std::hex << PC << std::dec << "|\n";
         uint32 instr_bytes = fetch();
         //Decode and read sources
-        FuncInstr cur_instr(instr_bytes, this->PC);
+        std::cout << 'D';
+        FuncInstr cur_instr( instr_bytes, this->PC);
         read_src( cur_instr);
         //Execute
+        std::cout << 'E';
         cur_instr.execute();
+        
+        if ( cur_instr.isRJump())
+        {
+            cur_instr.new_PC = rf->read( static_cast< RegNum>
+                ( cur_instr.get_src1_num_index()));
+        }
         //Memory access
+        std::cout << 'M';
         ld_st( cur_instr);       
         //Writeback
+        std::cout << 'W';
         wb( cur_instr);
         //Update PC
+        std::cout << 'U';
         updatePC( cur_instr);
         //Dump
+        std::cout << 'D' << std::endl;
         std::cout << cur_instr.Dump() << std::endl;
     }
 }
@@ -75,12 +90,10 @@ uint32 RF::read( RegNum index) const
 
 void RF::write( RegNum index, uint32 data)
 {
-    if (index == ZERO)
+    if (index != ZERO)
     {
-        std::cout << "ERROR.Writing to zero register" << std::endl;
-        exit( EXIT_FAILURE);
+        array[index] = data;
     }
-    array[index] = data;
 }
 
 void RF::reset( RegNum index)
@@ -112,7 +125,7 @@ void MIPS::load( FuncInstr& instr)
 
 void MIPS::store( const FuncInstr& instr)
 {
-    mem->write( instr.mem_addr, instr.v_dst, instr.mem_bytes);
+    mem->write( instr.mem_addr, instr.v_src2, instr.mem_bytes);
 }
 
 void MIPS::wb( const FuncInstr& instr)
