@@ -279,7 +279,7 @@ int FuncInstr::get_dest_num_index() const
             return instr.asI.rt;
         case OUT_R_JUMP:
         case OUT_J_JUMP:
-            return 31;
+            return RegNum::RA;
         default:
             return -1;
             break;

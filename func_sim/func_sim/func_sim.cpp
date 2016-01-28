@@ -28,15 +28,11 @@ void MIPS::run ( const string& tr, uint instr_to_run)
     for ( uint i = 0; i < instr_to_run; ++i)
     {
         //Fetch
-        std::cout << 'F' << std::endl;
-        std::cout << "--PC--|" << std::hex << PC << std::dec << "|\n";
         uint32 instr_bytes = fetch();
         //Decode and read sources
-        std::cout << 'D';
         FuncInstr cur_instr( instr_bytes, this->PC);
         read_src( cur_instr);
         //Execute
-        std::cout << 'E';
         cur_instr.execute();
         
         if ( cur_instr.isRJump())
@@ -45,16 +41,12 @@ void MIPS::run ( const string& tr, uint instr_to_run)
                 ( cur_instr.get_src1_num_index()));
         }
         //Memory access
-        std::cout << 'M';
         ld_st( cur_instr);       
         //Writeback
-        std::cout << 'W';
         wb( cur_instr);
         //Update PC
-        std::cout << 'U';
         updatePC( cur_instr);
         //Dump
-        std::cout << 'D' << std::endl;
         std::cout << cur_instr.Dump() << std::endl;
     }
 }

@@ -46,4 +46,19 @@ static const uint16 MAX_VAL16 = (uint16) -1;
 static const uint32 MAX_VAL32 = (uint32) -1;
 static const uint64 MAX_VAL64 = (uint64) -1;
 
+enum RegNum
+{
+    ZERO,
+    AT,
+    V0, V1,
+    A0, A1, A2, A3,
+    T0, T1, T2, T3, T4, T5, T6, T7,
+    S0, S1, S2, S3, S4, S5, S6, S7,
+    T8, T9,
+    K0, K1,
+    GP, SP,
+    S8, RA,
+    MAX_REG
+};
+
 #endif // #ifndef COMMON__TYPES_H 
