@@ -23,7 +23,7 @@ class PerfMIPS
         uint32 PC;
         FuncMemory* mem;
 
-        //ports
+        //data ports
         WritePort<uint32>* wp_fetch_2_decode;
         ReadPort<uint32>* rp_fetch_2_decode;
         WritePort<FuncInstr>* wp_decode_2_execute;
@@ -32,6 +32,16 @@ class PerfMIPS
         ReadPort<FuncInstr>* rp_execute_2_memory;
         WritePort<FuncInstr>* wp_memory_2_writeback;
         ReadPort<FuncInstr>* rp_memory_2_writeback;
+
+        //latency ports
+        WritePort<bool>* wp_fetch_2_decode_stall;
+        ReadPort<bool>* rp_fetch_2_decode_stall;
+        WritePort<bool>* wp_decode_2_execute_stall;
+        ReadPort<bool>* rp_decode_2_execute_stall;
+        WritePort<bool>* wp_execute_2_memory_stall;
+        ReadPort<bool>* rp_execute_2_memory_stall;
+        WritePort<bool>* wp_memory_2_writeback_stall;
+        ReadPort<bool>* rp_memory_2_writeback_stall;
 
         uint32 fetch() const { return mem->read(PC); }
         void read_src(FuncInstr& instr) const {
