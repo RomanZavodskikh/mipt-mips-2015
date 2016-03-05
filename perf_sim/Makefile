@@ -7,6 +7,9 @@
 # specifying relative path to the TRUNK
 TRUNK= ../
 
+# specifying flags for CXX compiler
+CXXFLAGS=-std=c++11
+
 # paths to look for headers
 vpath %.h $(TRUNK)/common
 vpath %.h $(TRUNK)/func_sim/elf_parser/
@@ -31,39 +34,39 @@ GTEST_LIB= $(TRUNK)/libs/gtest-1.6.0/libgtest.a
 #
 perf_sim: func_memory.o elf_parser.o func_instr.o perf_sim.o main.o log.o
 	@# don't forget to link ELF library using "-l elf"
-	$(CXX) -o $@ $^ -l elf
+	$(CXX) $(CXXFLAGS) -o $@ $^ -l elf
 	@echo "---------------------------------"
 	@echo "$@ is built SUCCESSFULLY"
 
 main.o: main.cpp perf_sim.h
-	$(CXX) -c $< $(INCL)
+	$(CXX) $(CXXFLAGS) -c $< $(INCL)
 
 perf_sim.o: perf_sim.cpp perf_sim.h types.h func_instr.h func_memory.h rf.h ports.h
-	$(CXX) -c $< $(INCL)
+	$(CXX) $(CXXFLAGS) -c $< $(INCL)
 
 func_instr.o: func_instr.cpp func_instr.h types.h
-	$(CXX) -c $< $(INCL)
+	$(CXX) $(CXXFLAGS) -c $< $(INCL)
     
 func_memory.o: func_memory.cpp func_memory.h types.h
-	$(CXX) -c $< $(INCL)
+	$(CXX) $(CXXFLAGS) -c $< $(INCL)
 
 elf_parser.o: elf_parser.cpp elf_parser.h types.h
-	$(CXX) -c $< $(INCL)
+	$(CXX) $(CXXFLAGS) -c $< $(INCL)
 
 portstest: portstest.o log.o
-	$(CXX) -o $@ $^ 
+	$(CXX) $(CXXFLAGS) -o $@ $^ 
 
 pp: pp.o log.o  
-	$(CXX) -o $@ $^ 
+	$(CXX) $(CXXFLAGS) -o $@ $^ 
 
 pp.o: pp.cpp ports.h
-	$(CXX) -c $< $(INCL)
+	$(CXX) $(CXXFLAGS) -c $< $(INCL)
 
 portstest.o: portstest.cpp ports.h
-	$(CXX) -c $< $(INCL)
+	$(CXX) $(CXXFLAGS) -c $< $(INCL)
 
 log.o: log.cpp log.h
-	$(CXX) -c $< $(INCL)
+	$(CXX) $(CXXFLAGS) -c $< $(INCL)
 
 clean:
 	@-rm *.o

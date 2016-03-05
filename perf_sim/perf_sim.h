@@ -1,5 +1,5 @@
 /*
- * perf_sim.cpp - mips performance simulator
+ * perf_sim.h - mips performance simulator
  * @author Roman Zavodskikh roman.zavodskikh@phystech.edu
  * Copyright 2016 MIPT-MIPS 
  */
@@ -42,6 +42,20 @@ class PerfMIPS
         ReadPort<bool>* rp_execute_2_memory_stall;
         WritePort<bool>* wp_memory_2_writeback_stall;
         ReadPort<bool>* rp_memory_2_writeback_stall;
+
+        //clock modules functions
+        void clock_fetch( int cycle);
+        void clock_decode( int cycle);
+        void clock_execute( int cycle);
+        void clock_memory( int cycle);
+        void clock_writeback( int cycle);
+
+        //checking the ability to run module on this cycle
+        bool ok_fetch();
+        bool ok_decode();
+        bool ok_execute();
+        bool ok_memory();
+        bool ok_writeback();
 
         uint32 fetch() const { return mem->read(PC); }
         void read_src(FuncInstr& instr) const {

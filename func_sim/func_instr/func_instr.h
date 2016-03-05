@@ -144,7 +144,7 @@ class FuncInstr
 
         bool complete;
 
-        const uint32 PC;
+        uint32 PC;
         uint32 new_PC;
 
         std::string disasm;
@@ -213,6 +213,11 @@ class FuncInstr
         uint32 lo;
 
         FuncInstr( uint32 bytes, uint32 PC = 0);
+        /* I had to add default constructor because it's required by writing
+         * to ports in the perf_sim (Assignment 4).
+         * Actually, it just creates NOP.
+         */
+        FuncInstr( ): FuncInstr( 0) {};
         std::string Dump( std::string indent = " ") const;
 
         RegNum get_src1_num() const { return src1; }

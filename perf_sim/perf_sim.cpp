@@ -1,3 +1,10 @@
+/*
+ * perf_sim.cpp - MIPS performance simulator
+ * @author Roman Zavodskikh roman.zavodskikh@phystech.edu
+ * Copyright 2016 MIPT-MIPS
+ */
+
+
 #include <iostream>
 
 #include <perf_sim.h>
@@ -97,4 +104,126 @@ void PerfMIPS::run(const std::string& tr, uint32 instrs_to_run)
 
 PerfMIPS::~PerfMIPS() {
     delete rf;
+}
+
+void PerfMIPS::clock_fetch( int cycle)
+{
+    bool is_stall;
+    rp_fetch_2_decode_stall->read( &is_stall, cycle);
+    if ( is_stall)
+    {
+        return;
+    }
+
+    uint32 cmd_code = fetch();
+
+    if ( ok_fetch())
+    {
+        wp_fetch_2_decode->write( cmd_code, cycle);
+    }
+}
+
+void PerfMIPS::clock_decode( int cycle)
+{
+    bool is_stall;
+    rp_decode_2_execute_stall->read( &is_stall, cycle);
+    if ( is_stall)
+    {
+        wp_fetch_2_decode_stall->write( true, cycle);
+        return;
+    }
+
+    uint32 cmd_code;
+    rp_fetch_2_decode->read( &cmd_code, cycle);
+
+    FuncInstr cur_instr = FuncInstr( cmd_code, PC);   
+    read_src( cur_instr);
+
+    if ( ok_decode())
+    {
+        wp_decode_2_execute->write( cur_instr, cycle);
+        wp_fetch_2_decode_stall->write( false, cycle);
+    }
+    else
+    {
+        wp_fetch_2_decode_stall->write( true, cycle);
+    }
+}
+
+void PerfMIPS::clock_execute( int cycle)
+{
+    bool is_stall;
+    rp_execute_2_memory_stall->read( &is_stall, cycle);
+    if ( is_stall)
+    {
+        wp_decode_2_execute_stall->write( true, cycle);
+        return;
+    }
+
+    FuncInstr cur_instr;
+    if ( !rp_decode_2_execute->read( &cur_instr, cycle))
+    {
+        return;
+    }
+
+    cur_instr.execute();
+
+    if( ok_execute())
+    {
+        wp_execute_2_memory->write( cur_instr, cycle);
+        wp_decode_2_execute_stall->write( false, cycle);
+    }
+    else
+    {
+        wp_decode_2_execute_stall->write( true, cycle);
+    }
+}
+
+void PerfMIPS::clock_memory( int cycle)
+{
+    bool is_stall;
+    rp_memory_2_writeback_stall->read( &is_stall, cycle);
+    if ( is_stall)
+    {
+        wp_execute_2_memory_stall->write( true, cycle);
+        return;
+    }
+
+    FuncInstr cur_instr;
+    if( !rp_execute_2_memory->read( &cur_instr, cycle))
+    {
+        return;
+    }
+
+    load_store( cur_instr);
+
+    if( ok_memory())
+    {
+        wp_memory_2_writeback->write( cur_instr, cycle);
+        wp_execute_2_memory_stall->write( false, cycle);
+    }
+    else
+    {
+        wp_execute_2_memory_stall->write( true, cycle);
+    }
+}
+
+void PerfMIPS::clock_writeback( int cycle)
+{
+    FuncInstr cur_instr;
+    if( !rp_memory_2_writeback->read( &cur_instr, cycle))
+    {
+        return;
+    }
+
+    wb( cur_instr);
+
+    if( ok_writeback())
+    {
+        wp_memory_2_writeback_stall->write( false, cycle);
+    }
+    else
+    {
+        wp_memory_2_writeback_stall->write( true, cycle);
+    }
 }
