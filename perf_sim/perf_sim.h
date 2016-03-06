@@ -16,6 +16,10 @@ const unsigned PORT_BW = 1;
 const unsigned PORT_FANOUT = 1;
 const unsigned PORT_LATENCY = 1;
 
+const unsigned WIDTH = 20;
+const unsigned WIDTH_STAGE = 10;
+const unsigned WIDTH_CYCLE = 7;
+
 class PerfMIPS
 {
     private:
@@ -51,11 +55,29 @@ class PerfMIPS
         void clock_writeback( int cycle);
 
         //checking the ability to run module on this cycle
-        bool ok_fetch();
-        bool ok_decode();
-        bool ok_execute();
-        bool ok_memory();
-        bool ok_writeback();
+        bool ok_fetch( uint32 cmd_code, int cycle);
+        bool ok_decode( FuncInstr& instr, int cycle);
+        bool ok_execute( FuncInstr& instr, int cycle);
+        bool ok_memory( FuncInstr& instr, int cycle);
+        bool ok_writeback( FuncInstr& instr, int cycle);
+
+        //functions for dump
+        void cout_not_ok_bubble() const;
+        void cout_stall_bubble() const;
+        void cout_not_readen_bubble() const;
+        void cout_stage(std::string stage, int cycle) const;
+        void cout_instr(const FuncInstr& instr) const;
+        void cout_cmd_code(uint32 code) const;
+
+        //stall flags
+        bool is_stall_fetch;
+        bool is_stall_decode;
+        bool is_stall_execute;
+        bool is_stall_memory;
+
+        //PeftMIPS state
+        bool silent;
+        int instrs_run;
 
         uint32 fetch() const { return mem->read(PC); }
         void read_src(FuncInstr& instr) const {
@@ -83,7 +105,7 @@ class PerfMIPS
         }
    public:
         PerfMIPS();
-        void run(const std::string& tr, uint32 instrs_to_run);
+        void run(const std::string& tr, uint32 instrs_to_run, bool silent);
         ~PerfMIPS();
 };
             

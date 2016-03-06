@@ -3,22 +3,22 @@
 
 int main()
 {
-    WritePort<double> one_wport("one", 32, 1);
-    ReadPort<double> one_rport("one", 5);
+    WritePort<bool> one_wport("one", 32, 1);
+    ReadPort<bool> one_rport("one", 5);
     one_wport.init();
     one_rport.init();
-    for (int i = 0; i < 9; ++i)
+    for (int i = 0; i < 19; ++i)
     {
         std::cout << "Cycle " << i << std::endl;
-        if (i == 0)
+        if (i == 10)
         {
-            double pi = 3.1415;
+            bool pi = true;
             one_wport.write( pi, i);
             std::cout << pi << " sended." << std::endl;
         }
-        double num;
-        one_rport.read( &num, i);
-        std::cout << num << " received." << std::endl;
+        bool num;
+        int rtr_val = one_rport.read( &num, i);
+        std::cout << num << " received. " << rtr_val << std::endl;
     }
     return 0;
 }

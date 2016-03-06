@@ -68,36 +68,33 @@ PerfMIPS::PerfMIPS()
     this->rp_memory_2_writeback_stall->init();
 
     rf = new RF();
+
+    is_stall_fetch = false;
+    is_stall_decode = false;
+    is_stall_execute = false;
+    is_stall_memory = false;
 }
 
-void PerfMIPS::run(const std::string& tr, uint32 instrs_to_run)
+void PerfMIPS::run(const std::string& tr, uint32 instrs_to_run, bool silent)
 {
+    this->silent = silent;
+    instrs_run = 0;
+
     mem = new FuncMemory(tr.c_str());
     PC = mem->startPC();
-    for (uint32 i = 0; i < instrs_to_run; ++i) {
-        // fetch
-        uint32 instr_bytes = fetch();
-   
-        // decode
-        FuncInstr instr(instr_bytes, PC);
-
-        // read sources
-        read_src(instr);
-
-        // execute
-        instr.execute();
-
-        // load/store
-        load_store(instr);
-
-        // writeback
-        wb(instr);
-        
-        // PC update
-        PC = instr.get_new_PC();
-        
-        // dump
-        std::cout << instr << std::endl;
+    int cycle = 0;
+    while ( instrs_run < instrs_to_run)
+    {
+        clock_fetch( cycle);
+        clock_decode( cycle);
+        clock_execute( cycle);
+        clock_memory( cycle);
+        clock_writeback( cycle);
+        if (!silent)
+        {
+            std::cout << "-----------------------------------" << std::endl;
+        }
+        cycle++;
     }
     delete mem;
 }
@@ -108,122 +105,252 @@ PerfMIPS::~PerfMIPS() {
 
 void PerfMIPS::clock_fetch( int cycle)
 {
-    bool is_stall;
-    rp_fetch_2_decode_stall->read( &is_stall, cycle);
-    if ( is_stall)
+    cout_stage("fetch", cycle);
+
+    rp_fetch_2_decode_stall->read( &is_stall_fetch, cycle);
+    if ( is_stall_fetch)
     {
+        cout_stall_bubble();
         return;
     }
 
     uint32 cmd_code = fetch();
+    //TODO: This is uncorrect code if we have jumps
+    PC += 4;
 
-    if ( ok_fetch())
+    if ( ok_fetch( cmd_code, cycle))
     {
         wp_fetch_2_decode->write( cmd_code, cycle);
+        cout_cmd_code( cmd_code);
+    }
+    else
+    {
+        cout_not_ok_bubble();
     }
 }
 
 void PerfMIPS::clock_decode( int cycle)
 {
-    bool is_stall;
-    rp_decode_2_execute_stall->read( &is_stall, cycle);
-    if ( is_stall)
+    cout_stage("decode", cycle);
+
+    rp_decode_2_execute_stall->read( &is_stall_decode, cycle);
+    if ( is_stall_decode)
     {
         wp_fetch_2_decode_stall->write( true, cycle);
+        cout_stall_bubble();
         return;
     }
 
+    #if 0
+    /* We don't need to decode on 0th cycle because 
+     * we don't have data from fetch
+     */
+    if ( cycle == 0)
+    {
+        cout_stall_bubble();
+        return;
+    }
+    #endif
+
     uint32 cmd_code;
-    rp_fetch_2_decode->read( &cmd_code, cycle);
+    if ( !rp_fetch_2_decode->read( &cmd_code, cycle))
+    {
+        cout_not_readen_bubble();
+        return;
+    }
 
     FuncInstr cur_instr = FuncInstr( cmd_code, PC);   
-    read_src( cur_instr);
+    rf->invalidate( cur_instr.get_dst_num());
 
-    if ( ok_decode())
+    if ( ok_decode( cur_instr, cycle))
     {
         wp_decode_2_execute->write( cur_instr, cycle);
         wp_fetch_2_decode_stall->write( false, cycle);
+        cout_instr( cur_instr);
     }
     else
     {
         wp_fetch_2_decode_stall->write( true, cycle);
+        cout_not_ok_bubble();
     }
 }
 
 void PerfMIPS::clock_execute( int cycle)
 {
-    bool is_stall;
-    rp_execute_2_memory_stall->read( &is_stall, cycle);
-    if ( is_stall)
+    cout_stage("execute", cycle);
+
+    rp_execute_2_memory_stall->read( &is_stall_execute, cycle);
+    if ( is_stall_execute)
     {
         wp_decode_2_execute_stall->write( true, cycle);
+        cout_stall_bubble();
         return;
     }
 
     FuncInstr cur_instr;
     if ( !rp_decode_2_execute->read( &cur_instr, cycle))
     {
+        cout_not_readen_bubble();
         return;
     }
+    
 
-    cur_instr.execute();
-
-    if( ok_execute())
+    if( ok_execute( cur_instr, cycle))
     {
+        read_src( cur_instr);
+        cur_instr.execute();
         wp_execute_2_memory->write( cur_instr, cycle);
         wp_decode_2_execute_stall->write( false, cycle);
+        cout_instr( cur_instr);
     }
     else
     {
         wp_decode_2_execute_stall->write( true, cycle);
+        cout_not_ok_bubble();
     }
 }
 
 void PerfMIPS::clock_memory( int cycle)
 {
-    bool is_stall;
-    rp_memory_2_writeback_stall->read( &is_stall, cycle);
-    if ( is_stall)
+    cout_stage("memory", cycle);
+
+    rp_memory_2_writeback_stall->read( &is_stall_memory, cycle);
+    if ( is_stall_memory)
     {
         wp_execute_2_memory_stall->write( true, cycle);
+        cout_stall_bubble();
         return;
     }
 
     FuncInstr cur_instr;
     if( !rp_execute_2_memory->read( &cur_instr, cycle))
     {
+        cout_not_readen_bubble();
         return;
     }
 
-    load_store( cur_instr);
-
-    if( ok_memory())
+    if( ok_memory( cur_instr, cycle))
     {
+        load_store( cur_instr);
+        cout_instr( cur_instr);
         wp_memory_2_writeback->write( cur_instr, cycle);
         wp_execute_2_memory_stall->write( false, cycle);
     }
     else
     {
         wp_execute_2_memory_stall->write( true, cycle);
+        cout_not_ok_bubble();
     }
 }
 
 void PerfMIPS::clock_writeback( int cycle)
 {
+    cout_stage("writeback", cycle);
+
     FuncInstr cur_instr;
     if( !rp_memory_2_writeback->read( &cur_instr, cycle))
     {
+        cout_not_readen_bubble();
         return;
     }
 
-    wb( cur_instr);
 
-    if( ok_writeback())
+    if( ok_writeback( cur_instr, cycle))
     {
+        instrs_run++;
+        wb( cur_instr);
+        std::cout << cur_instr << std::endl;
         wp_memory_2_writeback_stall->write( false, cycle);
     }
     else
     {
         wp_memory_2_writeback_stall->write( true, cycle);
+        cout_not_ok_bubble();
     }
 }
+
+bool PerfMIPS::ok_fetch( uint32 cmd_code, int cycle)
+{
+    return true;
+}
+
+bool PerfMIPS::ok_decode( FuncInstr& instr, int cycle)
+{
+    return true;
+}
+
+bool PerfMIPS::ok_execute( FuncInstr& instr, int cycle)
+{
+    return rf->check( instr.get_src1_num()) &&
+           rf->check( instr.get_src2_num());
+}
+
+bool PerfMIPS::ok_memory( FuncInstr& instr, int cycle)
+{
+    return rf->check( instr.get_src1_num()) &&
+           rf->check( instr.get_src2_num());
+}
+
+bool PerfMIPS::ok_writeback( FuncInstr& instr, int cycle)
+{
+    return rf->check( instr.get_src1_num()) &&
+           rf->check( instr.get_src2_num());
+}
+
+void PerfMIPS::cout_not_ok_bubble() const
+{
+    if (!silent)
+    {
+        std::cout.width(WIDTH);
+        std::cout << "bubble(not ok)" << std::endl;
+    }
+}
+
+void PerfMIPS::cout_not_readen_bubble() const
+{
+    if (!silent)
+    {
+        std::cout.width(WIDTH);
+        std::cout << "bubble(not readen)" << std::endl;
+    }
+}
+
+void PerfMIPS::cout_stall_bubble() const
+{
+    if (!silent)
+    {
+        std::cout.width(WIDTH);
+        std::cout << "bubble(stall)" << std::endl;
+    }
+}
+
+void PerfMIPS::cout_stage(std::string stage, int cycle) const
+{
+    if (!silent)
+    {
+        std::cout.width(WIDTH_STAGE);
+        std::cout << stage;
+        std::cout.width(WIDTH_CYCLE);
+        std::cout << "cycle " << cycle << " ";
+    }
+}
+
+void PerfMIPS::cout_cmd_code( uint32 cmd_code) const
+{
+    if (!silent)
+    {
+        std::cout.width(WIDTH);
+        std::cout << std::hex << std::showbase << cmd_code << std::dec;
+        std::cout << std::endl;
+    }
+}
+
+void PerfMIPS::cout_instr( const FuncInstr& instr) const
+{
+    if (!silent)
+    {
+        std::cout << instr;
+        std::cout << std::endl;
+    }
+}
+

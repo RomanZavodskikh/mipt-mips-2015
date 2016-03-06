@@ -253,7 +253,9 @@ template<class T> bool ReadPort<T>::read( T* address, uint64 cycle)
         return false;
     }
 
-    if ( _dataQueue.empty()) return false; // the port is empty
+    if ( _dataQueue.empty()) {
+        return false; // the port is empty
+    }
 
     if ( _dataQueue.front().cycle == cycle)
     {
