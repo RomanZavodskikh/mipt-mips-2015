@@ -55,11 +55,11 @@ class PerfMIPS
         void clock_writeback( int cycle);
 
         //checking the ability to run module on this cycle
-        bool ok_fetch( uint32 cmd_code, int cycle);
-        bool ok_decode( FuncInstr& instr, int cycle);
-        bool ok_execute( FuncInstr& instr, int cycle);
-        bool ok_memory( FuncInstr& instr, int cycle);
-        bool ok_writeback( FuncInstr& instr, int cycle);
+        bool ok_fetch( uint32 cmd_code, int cycle) const;
+        bool ok_decode( FuncInstr& instr, int cycle) const;
+        bool ok_execute( FuncInstr& instr, int cycle) const;
+        bool ok_memory( FuncInstr& instr, int cycle) const;
+        bool ok_writeback( FuncInstr& instr, int cycle) const;
 
         //functions for dump
         void cout_not_ok_bubble() const;
@@ -78,6 +78,8 @@ class PerfMIPS
         //PeftMIPS state
         bool silent;
         int instrs_run;
+
+        void ports_ctor();
 
         uint32 fetch() const { return mem->read(PC); }
         void read_src(FuncInstr& instr) const {

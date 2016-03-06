@@ -11,61 +11,7 @@
 
 PerfMIPS::PerfMIPS()
 {
-    this->wp_fetch_2_decode = new WritePort<uint32>("FETCH_2_DECODE",
-        PORT_BW, PORT_FANOUT);
-    this->rp_fetch_2_decode = new ReadPort<uint32>("FETCH_2_DECODE",
-        PORT_LATENCY);
-    this->wp_fetch_2_decode->init();
-    this->rp_fetch_2_decode->init();
-    
-    this->wp_fetch_2_decode_stall = new WritePort<bool>("FETCH_2_DECODE_STALL",
-        PORT_BW, PORT_FANOUT);
-    this->rp_fetch_2_decode_stall = new ReadPort<bool>("FETCH_2_DECODE_STALL",
-        PORT_LATENCY);
-    this->wp_fetch_2_decode_stall->init();
-    this->rp_fetch_2_decode_stall->init();
-
-    this->wp_decode_2_execute = new WritePort<FuncInstr>("DECODE_2_EXECUTE",
-        PORT_BW, PORT_FANOUT);
-    this->rp_decode_2_execute = new ReadPort<FuncInstr>("DECODE_2_EXECUTE",
-        PORT_LATENCY);
-    this->wp_decode_2_execute->init();
-    this->rp_decode_2_execute->init();
-    
-    this->wp_decode_2_execute_stall = new WritePort<bool>
-        ("DECODE_2_EXECUTE_STALL", PORT_BW, PORT_FANOUT);
-    this->rp_decode_2_execute_stall = new ReadPort<bool>
-        ("DECODE_2_EXECUTE_STALL", PORT_LATENCY);
-    this->wp_decode_2_execute_stall->init();
-    this->rp_decode_2_execute_stall->init();
-    
-    this->wp_execute_2_memory = new WritePort<FuncInstr>("EXECUTE_2_MEMORY",
-        PORT_BW, PORT_FANOUT);
-    this->rp_execute_2_memory = new ReadPort<FuncInstr>("EXECUTE_2_MEMORY",
-        PORT_LATENCY);
-    this->wp_execute_2_memory->init();
-    this->rp_execute_2_memory->init();
-    
-    this->wp_execute_2_memory_stall = new WritePort<bool>
-        ("EXECUTE_2_MEMORY_STALL", PORT_BW, PORT_FANOUT);
-    this->rp_execute_2_memory_stall = new ReadPort<bool>
-        ("EXECUTE_2_MEMORY_STALL", PORT_LATENCY);
-    this->wp_execute_2_memory_stall->init();
-    this->rp_execute_2_memory_stall->init();
-
-    this->wp_memory_2_writeback = new WritePort<FuncInstr>("MEMORY_2_WRITEBACK",
-        PORT_BW, PORT_FANOUT);
-    this->rp_memory_2_writeback = new ReadPort<FuncInstr>("MEMORY_2_WRITEBACK",
-        PORT_LATENCY);
-    this->wp_memory_2_writeback->init();
-    this->rp_memory_2_writeback->init();
-    
-    this->wp_memory_2_writeback_stall = new WritePort<bool>
-        ("MEMORY_2_WRITEBACK_STALL", PORT_BW, PORT_FANOUT);
-    this->rp_memory_2_writeback_stall = new ReadPort<bool>
-        ("MEMORY_2_WRITEBACK_STALL", PORT_LATENCY);
-    this->wp_memory_2_writeback_stall->init();
-    this->rp_memory_2_writeback_stall->init();
+    ports_ctor();
 
     rf = new RF();
 
@@ -106,7 +52,6 @@ PerfMIPS::~PerfMIPS() {
 void PerfMIPS::clock_fetch( int cycle)
 {
     cout_stage("fetch", cycle);
-
     rp_fetch_2_decode_stall->read( &is_stall_fetch, cycle);
     if ( is_stall_fetch)
     {
@@ -115,11 +60,11 @@ void PerfMIPS::clock_fetch( int cycle)
     }
 
     uint32 cmd_code = fetch();
-    //TODO: This is uncorrect code if we have jumps
-    PC += 4;
 
     if ( ok_fetch( cmd_code, cycle))
     {
+        //TODO: This is uncorrect code if we have jumps
+        PC += 4;
         wp_fetch_2_decode->write( cmd_code, cycle);
         cout_cmd_code( cmd_code);
     }
@@ -132,7 +77,6 @@ void PerfMIPS::clock_fetch( int cycle)
 void PerfMIPS::clock_decode( int cycle)
 {
     cout_stage("decode", cycle);
-
     rp_decode_2_execute_stall->read( &is_stall_decode, cycle);
     if ( is_stall_decode)
     {
@@ -140,17 +84,6 @@ void PerfMIPS::clock_decode( int cycle)
         cout_stall_bubble();
         return;
     }
-
-    #if 0
-    /* We don't need to decode on 0th cycle because 
-     * we don't have data from fetch
-     */
-    if ( cycle == 0)
-    {
-        cout_stall_bubble();
-        return;
-    }
-    #endif
 
     uint32 cmd_code;
     if ( !rp_fetch_2_decode->read( &cmd_code, cycle))
@@ -160,10 +93,9 @@ void PerfMIPS::clock_decode( int cycle)
     }
 
     FuncInstr cur_instr = FuncInstr( cmd_code, PC);   
-    rf->invalidate( cur_instr.get_dst_num());
-
     if ( ok_decode( cur_instr, cycle))
     {
+        rf->invalidate( cur_instr.get_dst_num());
         wp_decode_2_execute->write( cur_instr, cycle);
         wp_fetch_2_decode_stall->write( false, cycle);
         cout_instr( cur_instr);
@@ -178,7 +110,6 @@ void PerfMIPS::clock_decode( int cycle)
 void PerfMIPS::clock_execute( int cycle)
 {
     cout_stage("execute", cycle);
-
     rp_execute_2_memory_stall->read( &is_stall_execute, cycle);
     if ( is_stall_execute)
     {
@@ -193,7 +124,6 @@ void PerfMIPS::clock_execute( int cycle)
         cout_not_readen_bubble();
         return;
     }
-    
 
     if( ok_execute( cur_instr, cycle))
     {
@@ -213,7 +143,6 @@ void PerfMIPS::clock_execute( int cycle)
 void PerfMIPS::clock_memory( int cycle)
 {
     cout_stage("memory", cycle);
-
     rp_memory_2_writeback_stall->read( &is_stall_memory, cycle);
     if ( is_stall_memory)
     {
@@ -254,7 +183,6 @@ void PerfMIPS::clock_writeback( int cycle)
         return;
     }
 
-
     if( ok_writeback( cur_instr, cycle))
     {
         instrs_run++;
@@ -269,29 +197,29 @@ void PerfMIPS::clock_writeback( int cycle)
     }
 }
 
-bool PerfMIPS::ok_fetch( uint32 cmd_code, int cycle)
+bool PerfMIPS::ok_fetch( uint32 cmd_code, int cycle) const
 {
     return true;
 }
 
-bool PerfMIPS::ok_decode( FuncInstr& instr, int cycle)
+bool PerfMIPS::ok_decode( FuncInstr& instr, int cycle) const
 {
     return true;
 }
 
-bool PerfMIPS::ok_execute( FuncInstr& instr, int cycle)
+bool PerfMIPS::ok_execute( FuncInstr& instr, int cycle) const
 {
     return rf->check( instr.get_src1_num()) &&
            rf->check( instr.get_src2_num());
 }
 
-bool PerfMIPS::ok_memory( FuncInstr& instr, int cycle)
+bool PerfMIPS::ok_memory( FuncInstr& instr, int cycle) const
 {
     return rf->check( instr.get_src1_num()) &&
            rf->check( instr.get_src2_num());
 }
 
-bool PerfMIPS::ok_writeback( FuncInstr& instr, int cycle)
+bool PerfMIPS::ok_writeback( FuncInstr& instr, int cycle) const
 {
     return rf->check( instr.get_src1_num()) &&
            rf->check( instr.get_src2_num());
@@ -352,5 +280,64 @@ void PerfMIPS::cout_instr( const FuncInstr& instr) const
         std::cout << instr;
         std::cout << std::endl;
     }
+}
+
+void PerfMIPS::ports_ctor()
+{
+    this->wp_fetch_2_decode = new WritePort<uint32>("FETCH_2_DECODE",
+        PORT_BW, PORT_FANOUT);
+    this->rp_fetch_2_decode = new ReadPort<uint32>("FETCH_2_DECODE",
+        PORT_LATENCY);
+    this->wp_fetch_2_decode->init();
+    this->rp_fetch_2_decode->init();
+    
+    this->wp_fetch_2_decode_stall = new WritePort<bool>("FETCH_2_DECODE_STALL",
+        PORT_BW, PORT_FANOUT);
+    this->rp_fetch_2_decode_stall = new ReadPort<bool>("FETCH_2_DECODE_STALL",
+        PORT_LATENCY);
+    this->wp_fetch_2_decode_stall->init();
+    this->rp_fetch_2_decode_stall->init();
+
+    this->wp_decode_2_execute = new WritePort<FuncInstr>("DECODE_2_EXECUTE",
+        PORT_BW, PORT_FANOUT);
+    this->rp_decode_2_execute = new ReadPort<FuncInstr>("DECODE_2_EXECUTE",
+        PORT_LATENCY);
+    this->wp_decode_2_execute->init();
+    this->rp_decode_2_execute->init();
+    
+    this->wp_decode_2_execute_stall = new WritePort<bool>
+        ("DECODE_2_EXECUTE_STALL", PORT_BW, PORT_FANOUT);
+    this->rp_decode_2_execute_stall = new ReadPort<bool>
+        ("DECODE_2_EXECUTE_STALL", PORT_LATENCY);
+    this->wp_decode_2_execute_stall->init();
+    this->rp_decode_2_execute_stall->init();
+    
+    this->wp_execute_2_memory = new WritePort<FuncInstr>("EXECUTE_2_MEMORY",
+        PORT_BW, PORT_FANOUT);
+    this->rp_execute_2_memory = new ReadPort<FuncInstr>("EXECUTE_2_MEMORY",
+        PORT_LATENCY);
+    this->wp_execute_2_memory->init();
+    this->rp_execute_2_memory->init();
+    
+    this->wp_execute_2_memory_stall = new WritePort<bool>
+        ("EXECUTE_2_MEMORY_STALL", PORT_BW, PORT_FANOUT);
+    this->rp_execute_2_memory_stall = new ReadPort<bool>
+        ("EXECUTE_2_MEMORY_STALL", PORT_LATENCY);
+    this->wp_execute_2_memory_stall->init();
+    this->rp_execute_2_memory_stall->init();
+
+    this->wp_memory_2_writeback = new WritePort<FuncInstr>("MEMORY_2_WRITEBACK",
+        PORT_BW, PORT_FANOUT);
+    this->rp_memory_2_writeback = new ReadPort<FuncInstr>("MEMORY_2_WRITEBACK",
+        PORT_LATENCY);
+    this->wp_memory_2_writeback->init();
+    this->rp_memory_2_writeback->init();
+    
+    this->wp_memory_2_writeback_stall = new WritePort<bool>
+        ("MEMORY_2_WRITEBACK_STALL", PORT_BW, PORT_FANOUT);
+    this->rp_memory_2_writeback_stall = new ReadPort<bool>
+        ("MEMORY_2_WRITEBACK_STALL", PORT_LATENCY);
+    this->wp_memory_2_writeback_stall->init();
+    this->rp_memory_2_writeback_stall->init();
 }
 
