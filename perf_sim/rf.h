@@ -61,9 +61,6 @@ class RF
 
         inline void reset( RegNum reg)
         {
-            #if 0
-            array[reg] = Reg();
-            #endif
             array[reg].value = 0;
             array[reg].is_valid = true;
         }

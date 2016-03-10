@@ -19,11 +19,14 @@ PerfMIPS::PerfMIPS()
     is_stall_decode = false;
     is_stall_execute = false;
     is_stall_memory = false;
+
+    have_debt_decode = false;
+    have_debt_execute = false;
 }
 
-void PerfMIPS::run(const std::string& tr, uint32 instrs_to_run, bool silent)
+void PerfMIPS::run(const std::string& tr, uint32 instrs_to_run, bool silent_arg)
 {
-    this->silent = silent;
+    this->silent = silent_arg;
     instrs_run = 0;
 
     mem = new FuncMemory(tr.c_str());
@@ -55,18 +58,18 @@ void PerfMIPS::clock_fetch( int cycle)
     rp_fetch_2_decode_stall->read( &is_stall_fetch, cycle);
     if ( is_stall_fetch)
     {
+        wp_fetch_2_decode->write( cmd_code_fetch, cycle);
         cout_stall_bubble();
         return;
     }
 
-    uint32 cmd_code = fetch();
-
-    if ( ok_fetch( cmd_code, cycle))
+    cmd_code_fetch = fetch();
+    if ( ok_fetch( cmd_code_fetch, cycle))
     {
         //TODO: This is uncorrect code if we have jumps
         PC += 4;
-        wp_fetch_2_decode->write( cmd_code, cycle);
-        cout_cmd_code( cmd_code);
+        wp_fetch_2_decode->write( cmd_code_fetch, cycle);
+        cout_cmd_code( cmd_code_fetch);
     }
     else
     {
@@ -81,27 +84,41 @@ void PerfMIPS::clock_decode( int cycle)
     if ( is_stall_decode)
     {
         wp_fetch_2_decode_stall->write( true, cycle);
+        cur_instr_decode = FuncInstr( cmd_code_decode, PC);   
+        wp_decode_2_execute->write( cur_instr_decode, cycle);
         cout_stall_bubble();
         return;
     }
 
-    uint32 cmd_code;
-    if ( !rp_fetch_2_decode->read( &cmd_code, cycle))
+    if ( cycle == 0)
     {
-        cout_not_readen_bubble();
+        cout_stall_bubble();
         return;
     }
 
-    FuncInstr cur_instr = FuncInstr( cmd_code, PC);   
-    if ( ok_decode( cur_instr, cycle))
+    if ( have_debt_decode)
     {
-        rf->invalidate( cur_instr.get_dst_num());
-        wp_decode_2_execute->write( cur_instr, cycle);
-        wp_fetch_2_decode_stall->write( false, cycle);
-        cout_instr( cur_instr);
+        uint32 tmp;
+        rp_fetch_2_decode->read( &tmp, cycle);
     }
     else
     {
+        rp_fetch_2_decode->read( &cmd_code_decode, cycle);
+    }
+
+    cur_instr_decode = FuncInstr( cmd_code_decode, PC);   
+    if ( ok_decode( cur_instr_decode, cycle))
+    {
+        have_debt_decode = false;
+        read_src( cur_instr_decode);
+        rf->invalidate( cur_instr_decode.get_dst_num());
+        wp_decode_2_execute->write( cur_instr_decode, cycle);
+        wp_fetch_2_decode_stall->write( false, cycle);
+        cout_instr( cur_instr_decode);
+    }
+    else
+    {
+        have_debt_decode = true;
         wp_fetch_2_decode_stall->write( true, cycle);
         cout_not_ok_bubble();
     }
@@ -113,25 +130,25 @@ void PerfMIPS::clock_execute( int cycle)
     rp_execute_2_memory_stall->read( &is_stall_execute, cycle);
     if ( is_stall_execute)
     {
+        wp_execute_2_memory->write( cur_instr_execute, cycle);
         wp_decode_2_execute_stall->write( true, cycle);
         cout_stall_bubble();
         return;
     }
 
-    FuncInstr cur_instr;
-    if ( !rp_decode_2_execute->read( &cur_instr, cycle))
+    if ( !have_debt_execute
+        && !rp_decode_2_execute->read( &cur_instr_execute, cycle))
     {
         cout_not_readen_bubble();
         return;
     }
 
-    if( ok_execute( cur_instr, cycle))
+    if( ok_execute( cur_instr_execute, cycle))
     {
-        read_src( cur_instr);
-        cur_instr.execute();
-        wp_execute_2_memory->write( cur_instr, cycle);
+        cur_instr_execute.execute();
+        wp_execute_2_memory->write( cur_instr_execute, cycle);
         wp_decode_2_execute_stall->write( false, cycle);
-        cout_instr( cur_instr);
+        cout_instr( cur_instr_execute);
     }
     else
     {
@@ -147,22 +164,22 @@ void PerfMIPS::clock_memory( int cycle)
     if ( is_stall_memory)
     {
         wp_execute_2_memory_stall->write( true, cycle);
+        wp_memory_2_writeback->write( cur_instr_memory, cycle);
         cout_stall_bubble();
         return;
     }
 
-    FuncInstr cur_instr;
-    if( !rp_execute_2_memory->read( &cur_instr, cycle))
+    if( !rp_execute_2_memory->read( &cur_instr_memory, cycle))
     {
         cout_not_readen_bubble();
         return;
     }
 
-    if( ok_memory( cur_instr, cycle))
+    if( ok_memory( cur_instr_memory, cycle))
     {
-        load_store( cur_instr);
-        cout_instr( cur_instr);
-        wp_memory_2_writeback->write( cur_instr, cycle);
+        load_store( cur_instr_memory);
+        cout_instr( cur_instr_memory);
+        wp_memory_2_writeback->write( cur_instr_memory, cycle);
         wp_execute_2_memory_stall->write( false, cycle);
     }
     else
@@ -176,18 +193,17 @@ void PerfMIPS::clock_writeback( int cycle)
 {
     cout_stage("writeback", cycle);
 
-    FuncInstr cur_instr;
-    if( !rp_memory_2_writeback->read( &cur_instr, cycle))
+    if( !rp_memory_2_writeback->read( &cur_instr_writeback, cycle))
     {
         cout_not_readen_bubble();
         return;
     }
 
-    if( ok_writeback( cur_instr, cycle))
+    if( ok_writeback( cur_instr_writeback, cycle))
     {
         instrs_run++;
-        wb( cur_instr);
-        std::cout << cur_instr << std::endl;
+        wb( cur_instr_writeback);
+        std::cout << cur_instr_writeback << std::endl;
         wp_memory_2_writeback_stall->write( false, cycle);
     }
     else
@@ -204,25 +220,23 @@ bool PerfMIPS::ok_fetch( uint32 cmd_code, int cycle) const
 
 bool PerfMIPS::ok_decode( FuncInstr& instr, int cycle) const
 {
-    return true;
+    return rf->check( instr.get_src1_num()) &&
+           rf->check( instr.get_src2_num());
 }
 
 bool PerfMIPS::ok_execute( FuncInstr& instr, int cycle) const
 {
-    return rf->check( instr.get_src1_num()) &&
-           rf->check( instr.get_src2_num());
+    return true;
 }
 
 bool PerfMIPS::ok_memory( FuncInstr& instr, int cycle) const
 {
-    return rf->check( instr.get_src1_num()) &&
-           rf->check( instr.get_src2_num());
+    return true;
 }
 
 bool PerfMIPS::ok_writeback( FuncInstr& instr, int cycle) const
 {
-    return rf->check( instr.get_src1_num()) &&
-           rf->check( instr.get_src2_num());
+    return true;
 }
 
 void PerfMIPS::cout_not_ok_bubble() const

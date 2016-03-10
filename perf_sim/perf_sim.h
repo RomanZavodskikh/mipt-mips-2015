@@ -74,10 +74,22 @@ class PerfMIPS
         bool is_stall_decode;
         bool is_stall_execute;
         bool is_stall_memory;
+        bool have_debt_execute;
+        bool have_debt_decode;
 
         //PeftMIPS state
         bool silent;
-        int instrs_run;
+        uint32 instrs_run;
+
+        //PeftMIPS components state
+        uint32 cmd_code_fetch;
+        uint32 cmd_code_decode;
+        FuncInstr cur_instr_decode;
+        FuncInstr cur_instr_execute;
+        FuncInstr cur_instr_memory;
+        FuncInstr cur_instr_writeback;
+        std::queue< FuncInstr> instr_queue_execute;
+        std::queue< uint32> instr_queue_decode;
 
         void ports_ctor();
 
