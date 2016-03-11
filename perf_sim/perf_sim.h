@@ -25,6 +25,7 @@ class PerfMIPS
     private:
         RF* rf;
         uint32 PC;
+        bool PC_valid;
         FuncMemory* mem;
 
         //data ports
@@ -74,8 +75,6 @@ class PerfMIPS
         bool is_stall_decode;
         bool is_stall_execute;
         bool is_stall_memory;
-        bool have_debt_execute;
-        bool have_debt_decode;
 
         //PeftMIPS state
         bool silent;
@@ -88,10 +87,11 @@ class PerfMIPS
         FuncInstr cur_instr_execute;
         FuncInstr cur_instr_memory;
         FuncInstr cur_instr_writeback;
-        std::queue< FuncInstr> instr_queue_execute;
-        std::queue< uint32> instr_queue_decode;
+        std::queue< uint32> decode_queue;
 
         void ports_ctor();
+
+        bool is_jump_code(uint32 cmd_code) const;
 
         uint32 fetch() const { return mem->read(PC); }
         void read_src(FuncInstr& instr) const {

@@ -20,8 +20,7 @@ PerfMIPS::PerfMIPS()
     is_stall_execute = false;
     is_stall_memory = false;
 
-    have_debt_decode = false;
-    have_debt_execute = false;
+    PC_valid = true;
 }
 
 void PerfMIPS::run(const std::string& tr, uint32 instrs_to_run, bool silent_arg)
@@ -58,7 +57,6 @@ void PerfMIPS::clock_fetch( int cycle)
     rp_fetch_2_decode_stall->read( &is_stall_fetch, cycle);
     if ( is_stall_fetch)
     {
-        wp_fetch_2_decode->write( cmd_code_fetch, cycle);
         cout_stall_bubble();
         return;
     }
@@ -66,8 +64,11 @@ void PerfMIPS::clock_fetch( int cycle)
     cmd_code_fetch = fetch();
     if ( ok_fetch( cmd_code_fetch, cycle))
     {
-        //TODO: This is uncorrect code if we have jumps
         PC += 4;
+        if ( is_jump_code( cmd_code_fetch))
+        {
+            PC_valid = false;
+        }
         wp_fetch_2_decode->write( cmd_code_fetch, cycle);
         cout_cmd_code( cmd_code_fetch);
     }
@@ -84,32 +85,25 @@ void PerfMIPS::clock_decode( int cycle)
     if ( is_stall_decode)
     {
         wp_fetch_2_decode_stall->write( true, cycle);
-        cur_instr_decode = FuncInstr( cmd_code_decode, PC);   
-        wp_decode_2_execute->write( cur_instr_decode, cycle);
         cout_stall_bubble();
         return;
     }
 
-    if ( cycle == 0)
+    if ( rp_fetch_2_decode->read( &cmd_code_decode, cycle))
     {
-        cout_stall_bubble();
+        decode_queue.push( cmd_code_decode);   
+    }
+    if ( decode_queue.empty())
+    {
+        cout_not_readen_bubble();
         return;
     }
-
-    if ( have_debt_decode)
-    {
-        uint32 tmp;
-        rp_fetch_2_decode->read( &tmp, cycle);
-    }
-    else
-    {
-        rp_fetch_2_decode->read( &cmd_code_decode, cycle);
-    }
+    cmd_code_decode = decode_queue.front();
 
     cur_instr_decode = FuncInstr( cmd_code_decode, PC);   
     if ( ok_decode( cur_instr_decode, cycle))
     {
-        have_debt_decode = false;
+        decode_queue.pop();
         read_src( cur_instr_decode);
         rf->invalidate( cur_instr_decode.get_dst_num());
         wp_decode_2_execute->write( cur_instr_decode, cycle);
@@ -118,7 +112,6 @@ void PerfMIPS::clock_decode( int cycle)
     }
     else
     {
-        have_debt_decode = true;
         wp_fetch_2_decode_stall->write( true, cycle);
         cout_not_ok_bubble();
     }
@@ -136,8 +129,7 @@ void PerfMIPS::clock_execute( int cycle)
         return;
     }
 
-    if ( !have_debt_execute
-        && !rp_decode_2_execute->read( &cur_instr_execute, cycle))
+    if ( !rp_decode_2_execute->read( &cur_instr_execute, cycle))
     {
         cout_not_readen_bubble();
         return;
@@ -203,6 +195,11 @@ void PerfMIPS::clock_writeback( int cycle)
     {
         instrs_run++;
         wb( cur_instr_writeback);
+        if ( cur_instr_writeback.is_jump())
+        {
+            PC_valid = true;
+            PC = cur_instr_writeback.get_new_PC();
+        }
         std::cout << cur_instr_writeback << std::endl;
         wp_memory_2_writeback_stall->write( false, cycle);
     }
@@ -215,7 +212,7 @@ void PerfMIPS::clock_writeback( int cycle)
 
 bool PerfMIPS::ok_fetch( uint32 cmd_code, int cycle) const
 {
-    return true;
+    return PC_valid;
 }
 
 bool PerfMIPS::ok_decode( FuncInstr& instr, int cycle) const
@@ -353,5 +350,11 @@ void PerfMIPS::ports_ctor()
         ("MEMORY_2_WRITEBACK_STALL", PORT_LATENCY);
     this->wp_memory_2_writeback_stall->init();
     this->rp_memory_2_writeback_stall->init();
+}
+
+bool PerfMIPS::is_jump_code( uint32 cmd_code) const
+{
+    FuncInstr tmp_instr( cmd_code, PC);
+    return tmp_instr.is_jump();
 }
 
