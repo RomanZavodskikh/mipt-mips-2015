@@ -34,10 +34,10 @@ int main( int argc, char** argv)
 
     std::ofstream out_file;
     out_file.open(argv[2]);
-    for ( unsigned size_in_bytes = kilo; size_in_bytes <= 1024*kilo;
-            size_in_bytes *= 2)
+    for ( unsigned ways = 1; ways <= 16; ways*=2)
     {
-        for ( unsigned ways = 1; ways <= 1; ways*=2)
+        for ( unsigned size_in_bytes = kilo; size_in_bytes <= 1024*kilo;
+                size_in_bytes *= 2)
         {
             CacheTagArray tag_array( size_in_bytes, ways, block_size_in_bytes,
                 addr_size_in_bits);
@@ -64,8 +64,8 @@ int main( int argc, char** argv)
             }
             mem_trace.close();
 
-            double prob = ( double)right_times / times;
-            out_file << prob << " ";
+            double prob = 1 - ( double)right_times / times;
+            out_file << prob << ",";
         }
         out_file << std::endl;
     }

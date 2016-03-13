@@ -23,13 +23,9 @@ CacheTagArray::CacheTagArray( unsigned size_in_bytes,
      block_size_in_bytes_(block_size_in_bytes),
      addr_size_in_bits_(addr_size_in_bits),
      tag_array_size_(size_in_bytes/ways/block_size_in_bytes),
-     tag_arrays_(new std::map< unsigned, uint64>[ways_])
+     tag_arrays_(new std::map< unsigned, uint64>[ways_]),
+     LRU_data(new std::deque< unsigned short>[tag_array_size_])
 {
-    if ( ways != 1)
-    {
-        std::cout << "The multi-way isn\'t supported yet." << std::endl;
-        std::exit(EXIT_FAILURE);
-    }
 }
 
 CacheTagArray::~CacheTagArray()
@@ -42,22 +38,35 @@ bool CacheTagArray::read( uint64 addr)
     uint64 tag = getTag( addr);
     uint64 set = getSet( addr);
     
-    if (tag_arrays_[0][set] == tag)
+    for( unsigned short way = 0; way < ways_; ++way)
     {
-        return true;
+        if (tag_arrays_[way][set] == tag)
+        {
+             //Update the LRU info
+            deleteWayFromSet( way, set);
+            addWayToSet( way, set);
+            return true;
+        }
     }
-    else
-    {
-        return false;
-    }
+    return false;
 }
 
 void CacheTagArray::write( uint64 addr)
 {
     uint64 tag = getTag( addr);
     uint64 set = getSet( addr);
+
+    unsigned short way = 0;
+    if ( !LRU_data[ set].empty())
+    {
+        way = LRU_data[ set].front();
+    }
     
-    tag_arrays_[0][set] = tag;
+    tag_arrays_[way][set] = tag;
+
+    //Update the LRU info
+    deleteWayFromSet( way, set);
+    addWayToSet( way, set);
 }
 
 
@@ -133,3 +142,20 @@ void CacheTagArray::is2powerTest() const
     std::cout << "===End of testing is2power" << std::endl;
 }
 
+void CacheTagArray::deleteWayFromSet( unsigned short way, uint64 set)
+{
+    std::deque<unsigned short>::iterator it;
+    for( it=LRU_data[ set].begin(); it != LRU_data[ set].end(); ++it)
+    {
+        if( *it == way)
+        {
+            LRU_data[ set].erase( it);
+            return;
+        }
+    }
+}
+
+void CacheTagArray::addWayToSet( unsigned short way, uint64 set)
+{
+    LRU_data[ set].push_back( way);
+}
