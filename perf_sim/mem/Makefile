@@ -8,7 +8,7 @@
 TRUNK=../../
 
 # specifying flags for C++ compiler
-CXXFLAGS=-std=c++11 -Wall -Werror -Wpedantic -Wshadow
+CXXFLAGS=-std=c++11 -Wall -Werror -Wpedantic -Wshadow -Wextra -Wparentheses
 
 # option for C++ compiler for searching for include directories
 INCL= -I ./ -I $(TRUNK)common/
@@ -25,5 +25,5 @@ miss_rate_sim.exe: cache_tag_array.o miss_rate_sim.o
 	$(CXX) $(CXXFLAGS) -c -o $@ $^ $(INCL)
 
 clean:
-	-rm *.o
+	-rm *.o *.csv
 	-rm miss_rate_sim.exe
