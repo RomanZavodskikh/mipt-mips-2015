@@ -17,73 +17,84 @@
 CacheTagArray::CacheTagArray( unsigned size_in_bytes,
                               unsigned ways,
                               unsigned short block_size_in_bytes,
-                              unsigned short addr_size_in_bits)
-    :size_in_bytes_(size_in_bytes),
-     ways_(ways),
+                              unsigned short addr_size_in_bits,
+                              bool fully)
+    :fully_(fully),
+     size_in_bytes_(size_in_bytes),
+     ways_(fully_?1:ways),
      block_size_in_bytes_(block_size_in_bytes),
      addr_size_in_bits_(addr_size_in_bits),
-     tag_array_size_(size_in_bytes/ways/block_size_in_bytes),
+     tag_array_size_(size_in_bytes_/ways_/block_size_in_bytes_),
      tag_arrays_(new std::map< unsigned, uint64>[ways_]),
-     LRU_data(new std::deque< unsigned short>[tag_array_size_])
+     LRU_data_((fully_)?new std::deque<unsigned short>:
+        new std::deque< unsigned short>[tag_array_size_]),
+     offset_width_(log2upped(block_size_in_bytes_)),
+     set_width_(log2upped(tag_array_size_))
 {
+    if( !fully_)
+    {
+        for( unsigned set = 0; set < tag_array_size_; ++set)
+        {
+            for( unsigned short way = 0; way < ways_; ++way)
+            {
+                LRU_data_[ set].push_back( way);
+            }
+        }
+    }
 }
 
 CacheTagArray::~CacheTagArray()
 {
     delete[] tag_arrays_;
+    if ( fully_)
+    {
+        delete LRU_data_;
+    }
+    else
+    {
+        delete [] LRU_data_;
+    }
 }
 
 bool CacheTagArray::read( uint64 addr)
 {
-    uint64 tag = getTag( addr);
-    uint64 set = getSet( addr);
-    
-    for( unsigned short way = 0; way < ways_; ++way)
+    if ( !fully_)
     {
-        if (tag_arrays_[way][set] == tag)
-        {
-             //Update the LRU info
-            deleteWayFromSet( way, set);
-            addWayToSet( way, set);
-            return true;
-        }
+        return read_not_fully( addr);
     }
-    return false;
+    else
+    {
+        return read_fully( addr);
+    }
 }
 
 void CacheTagArray::write( uint64 addr)
 {
-    uint64 tag = getTag( addr);
-    uint64 set = getSet( addr);
-
-    unsigned short way = 0;
-    if ( !LRU_data[ set].empty())
+    if( !fully_)
     {
-        way = LRU_data[ set].front();
+        write_not_fully( addr);
     }
-    
-    tag_arrays_[way][set] = tag;
-
-    //Update the LRU info
-    deleteWayFromSet( way, set);
-    addWayToSet( way, set);
+    else
+    {
+        write_fully( addr);
+    }
 }
 
 
-uint64 CacheTagArray::getTag( uint64 addr) const
+uint64 CacheTagArray::getTagNotFully( uint64 addr) const
 {
-    addr >>= log2upped( block_size_in_bytes_);
-    addr >>= log2upped( tag_array_size_);
+    addr >>= offset_width_;
+    addr >>= set_width_;
     return addr;
 }
 
-uint64 CacheTagArray::getSet( uint64 addr) const
+uint64 CacheTagArray::getSetNotFully( uint64 addr) const
 {
-    uint64 tag = getTag( addr);
-    tag <<= log2upped( block_size_in_bytes_) + log2upped( tag_array_size_);
+    uint64 tag = getTagNotFully( addr);
+    tag <<= offset_width_ + set_width_;
     addr -= tag;
 
-    addr >>= log2upped( block_size_in_bytes_);
+    addr >>= offset_width_;
     return addr;
 }
 
@@ -96,7 +107,7 @@ unsigned short CacheTagArray::log2upped( unsigned num) const
         num >>= 1;
         rtr_val++;
     }
-    if (is_2_power)
+    if ( is_2_power)
     {
         rtr_val--;
     }
@@ -142,20 +153,108 @@ void CacheTagArray::is2powerTest() const
     std::cout << "===End of testing is2power" << std::endl;
 }
 
-void CacheTagArray::deleteWayFromSet( unsigned short way, uint64 set)
+void CacheTagArray::deleteWayFromSetNotFully( unsigned short way, uint64 set)
 {
     std::deque<unsigned short>::iterator it;
-    for( it=LRU_data[ set].begin(); it != LRU_data[ set].end(); ++it)
+    for( it=LRU_data_[ set].begin(); it != LRU_data_[ set].end(); ++it)
     {
         if( *it == way)
         {
-            LRU_data[ set].erase( it);
+            LRU_data_[ set].erase( it);
             return;
         }
     }
 }
 
-void CacheTagArray::addWayToSet( unsigned short way, uint64 set)
+void CacheTagArray::addWayToSetNotFully( unsigned short way, uint64 set)
 {
-    LRU_data[ set].push_back( way);
+    LRU_data_[ set].push_back( way);
 }
+
+bool CacheTagArray::read_fully( uint64 addr)
+{
+    uint64 tag = getTagFully( addr);
+    for ( unsigned long tag_place = 0; tag_place < tag_array_size_;
+        ++tag_place)
+    {
+        if ( tag_arrays_[0][tag_place] == tag)
+        {
+            //Update LRU info
+            deleteTagFromLRUFully( tag_place);
+            addTagToLRUFully( tag_place);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool CacheTagArray::read_not_fully( uint64 addr)
+{
+    uint64 tag = getTagNotFully( addr);
+    uint64 set = getSetNotFully( addr);
+    
+    for( unsigned short way = 0; way < ways_; ++way)
+    {
+        if (tag_arrays_[way][set] == tag)
+        {
+            //Update the LRU info
+            deleteWayFromSetNotFully( way, set);
+            addWayToSetNotFully( way, set);
+            return true;
+        }
+    }
+    return false;
+}
+
+void CacheTagArray::write_fully( uint64 addr)
+{
+    uint64 tag = getTagFully( addr);
+    unsigned tag_place = LRU_data_->front();
+    tag_arrays_[0][tag_place] = tag;
+
+    //Update LRU info
+    deleteTagFromLRUFully( tag_place);
+    addTagToLRUFully( tag_place);
+}
+
+void CacheTagArray::write_not_fully( uint64 addr)
+{
+    uint64 tag = getTagNotFully( addr);
+    uint64 set = getSetNotFully( addr);
+
+    unsigned short way = 0;
+    if ( !LRU_data_[ set].empty())
+    {
+        way = LRU_data_[ set].front();
+    }
+    
+    tag_arrays_[way][set] = tag;
+
+    //Update the LRU info
+    deleteWayFromSetNotFully( way, set);
+    addWayToSetNotFully( way, set);
+}
+
+uint64 CacheTagArray::getTagFully( uint64 addr) const
+{
+    return addr >> log2upped(addr_size_in_bits_);
+}
+
+void CacheTagArray::deleteTagFromLRUFully( unsigned tag_place)
+{
+    std::deque<unsigned short>::iterator it;
+    for (it = LRU_data_->begin(); it != LRU_data_->end(); ++it)
+    {
+        if( *it == tag_place)
+        {
+            LRU_data_->erase( it);
+            return;
+        }
+    }
+}
+
+void CacheTagArray::addTagToLRUFully( unsigned tag_place)
+{
+    LRU_data_->push_back( tag_place);
+}
+

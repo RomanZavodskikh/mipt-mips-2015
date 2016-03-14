@@ -32,15 +32,28 @@ int main( int argc, char** argv)
     test_ta.log2uppedTest();
     test_ta.is2powerTest();
 
+
     std::ofstream out_file;
     out_file.open(argv[2]);
-    for ( unsigned ways = 1; ways <= 16; ways*=2)
+    out_file << ",1KB,2KB,4KB,8KB,16KB,32KB,64KB,128KB,256KB,512KB,1024KB"
+             << std::endl;
+    for ( unsigned ways = 0; ways <= 16; ( ways==0)?ways=1:ways*=2)
+    // 0 ways means fully associative cache
     {
+        if( ways!= 0)
+        {
+            out_file << ways << "way(s),";
+        }
+        else
+        {
+            out_file << "fully,";
+        }
+
         for ( unsigned size_in_bytes = kilo; size_in_bytes <= 1024*kilo;
                 size_in_bytes *= 2)
         {
             CacheTagArray tag_array( size_in_bytes, ways, block_size_in_bytes,
-                addr_size_in_bits);
+                addr_size_in_bits, ways==0);
             std::ifstream mem_trace;
             mem_trace.open(argv[1]);
 

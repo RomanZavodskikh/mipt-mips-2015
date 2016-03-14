@@ -17,27 +17,40 @@
 class CacheTagArray
 {
 private:
+    const bool fully_;
     const unsigned size_in_bytes_;
     const unsigned ways_;
     const unsigned short block_size_in_bytes_;
     const unsigned short addr_size_in_bits_;
     const unsigned tag_array_size_;
     std::map< unsigned, uint64>* const tag_arrays_;
-    std::deque< unsigned short>* LRU_data;
+    std::deque< unsigned short>* LRU_data_;
 
-    uint64 getTag( uint64 addr) const;
-    uint64 getSet( uint64 addr) const;
+    const unsigned short offset_width_;
+    const unsigned short set_width_;
+
+    uint64 getTagNotFully( uint64 addr) const;
+    uint64 getSetNotFully( uint64 addr) const;
     uint64 getOffset( uint64 addr) const;
+    uint64 getTagFully( uint64 addr) const;
     unsigned short log2upped( unsigned num) const;
     bool is2power( unsigned num) const;
 
-    void deleteWayFromSet( unsigned short way, uint64 set);
-    void addWayToSet( unsigned short way, uint64 set);
+    void deleteWayFromSetNotFully( unsigned short way, uint64 set);
+    void addWayToSetNotFully( unsigned short way, uint64 set);
+    void deleteTagFromLRUFully( unsigned tag_place);
+    void addTagToLRUFully( unsigned tag_place);
+
+    bool read_fully( uint64 addr);
+    bool read_not_fully( uint64 addr);
+    void write_fully( uint64 addr);
+    void write_not_fully( uint64 addr);
 public:
     CacheTagArray( unsigned size_in_bytes,
                    unsigned ways,
                    unsigned short block_size_in_bytes,
-                   unsigned short addr_size_in_bits);
+                   unsigned short addr_size_in_bits,
+                   bool fully = false);
     ~CacheTagArray();
 
     bool read( uint64 addr);
