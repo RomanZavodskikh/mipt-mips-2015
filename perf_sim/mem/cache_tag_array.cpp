@@ -25,7 +25,7 @@ CacheTagArray::CacheTagArray( unsigned size_in_bytes,
      block_size_in_bytes_(block_size_in_bytes),
      addr_size_in_bits_(addr_size_in_bits),
      tag_array_size_(size_in_bytes_/ways_/block_size_in_bytes_),
-     tag_arrays_(new std::map< unsigned, uint64>[ways_]),
+     tag_arrays_(new uint64*[ways_]),
      LRU_data_((fully_)?new std::deque<unsigned short>:
         new std::deque< unsigned short>[tag_array_size_]),
      offset_width_(log2upped(block_size_in_bytes_)),
@@ -41,11 +41,22 @@ CacheTagArray::CacheTagArray( unsigned size_in_bytes,
             }
         }
     }
+    else
+    {
+        for( unsigned set = 0; set < MAX_LRU_DATA_SIZE_; ++set)
+        {
+            LRU_data_->push_back( set);
+        }
+    }
+
+    for( unsigned way = 0; way < ways_; ++way)
+    {
+        tag_arrays_[ way] = new uint64[ tag_array_size_];
+    }
 }
 
 CacheTagArray::~CacheTagArray()
 {
-    delete[] tag_arrays_;
     if ( fully_)
     {
         delete LRU_data_;
@@ -213,7 +224,7 @@ void CacheTagArray::write_fully( uint64 addr)
     tag_arrays_[0][tag_place] = tag;
 
     //Update LRU info
-    deleteTagFromLRUFully( tag_place);
+    LRU_data_->pop_front();
     addTagToLRUFully( tag_place);
 }
 
@@ -255,6 +266,10 @@ void CacheTagArray::deleteTagFromLRUFully( unsigned tag_place)
 
 void CacheTagArray::addTagToLRUFully( unsigned tag_place)
 {
+    if( LRU_data_->size() >= MAX_LRU_DATA_SIZE_)
+    {
+        LRU_data_->pop_back();
+    }
     LRU_data_->push_back( tag_place);
 }
 

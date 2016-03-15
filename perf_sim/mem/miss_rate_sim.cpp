@@ -7,6 +7,7 @@
 //C++ headers
 #include <iostream>
 #include <fstream>
+#include <chrono>
 
 //C headers
 #include <cstdlib>
@@ -37,16 +38,23 @@ int main( int argc, char** argv)
     out_file.open(argv[2]);
     out_file << ",1KB,2KB,4KB,8KB,16KB,32KB,64KB,128KB,256KB,512KB,1024KB"
              << std::endl;
-    for ( unsigned ways = 0; ways <= 16; ( ways==0)?ways=1:ways*=2)
+
+    std::ofstream time_data;
+    time_data.open("time_data.csv");
+    time_data << ",1KB,2KB,4KB,8KB,16KB,32KB,64KB,128KB,256KB,512KB,1024KB"
+              << std::endl;
+    for ( unsigned ways = 1; ways <= 16; ( ways==0)?ways=1:ways*=2)
     // 0 ways means fully associative cache
     {
         if( ways!= 0)
         {
             out_file << ways << "way(s),";
+            time_data << ways << "way(s),";
         }
         else
         {
             out_file << "fully,";
+            time_data << ways << "way(s),";
         }
 
         for ( unsigned size_in_bytes = kilo; size_in_bytes <= 1024*kilo;
@@ -59,6 +67,9 @@ int main( int argc, char** argv)
 
             unsigned long times = 0;
             unsigned long right_times = 0;
+
+            std::chrono::time_point< std::chrono::system_clock> start, end;
+            start = std::chrono::system_clock::now();
 
             while ( !mem_trace.eof())
             {
@@ -75,12 +86,19 @@ int main( int argc, char** argv)
                 }
                 times++;
             }
+
+            end = std::chrono::system_clock::now();
+
             mem_trace.close();
 
             double prob = 1 - ( double)right_times / times;
             out_file << prob << ",";
+
+            std::chrono::duration< double> elapsed_secs = end-start;
+            time_data << elapsed_secs.count() << ",";
         }
         out_file << std::endl;
+        time_data << std::endl;
     }
     out_file.close();
 

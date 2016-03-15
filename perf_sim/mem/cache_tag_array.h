@@ -23,8 +23,10 @@ private:
     const unsigned short block_size_in_bytes_;
     const unsigned short addr_size_in_bits_;
     const unsigned tag_array_size_;
-    std::map< unsigned, uint64>* const tag_arrays_;
+    uint64** const tag_arrays_;
     std::deque< unsigned short>* LRU_data_;
+
+    const static unsigned MAX_LRU_DATA_SIZE_ = 2048;
 
     const unsigned short offset_width_;
     const unsigned short set_width_;
