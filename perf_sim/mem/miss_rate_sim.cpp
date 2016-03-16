@@ -43,7 +43,7 @@ int main( int argc, char** argv)
     time_data.open("time_data.csv");
     time_data << ",1KB,2KB,4KB,8KB,16KB,32KB,64KB,128KB,256KB,512KB,1024KB"
               << std::endl;
-    for ( unsigned ways = 1; ways <= 16; ( ways==0)?ways=1:ways*=2)
+    for ( unsigned ways = 0; ways <= 256; ( ways==0)?ways=1:ways*=2)
     // 0 ways means fully associative cache
     {
         if( ways!= 0)
@@ -54,7 +54,7 @@ int main( int argc, char** argv)
         else
         {
             out_file << "fully,";
-            time_data << ways << "way(s),";
+            time_data << "fully,";
         }
 
         for ( unsigned size_in_bytes = kilo; size_in_bytes <= 1024*kilo;
@@ -104,3 +104,4 @@ int main( int argc, char** argv)
 
     return 0;
 }
+

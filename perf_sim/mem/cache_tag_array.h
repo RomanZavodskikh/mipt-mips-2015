@@ -10,6 +10,7 @@
 //C++ modules
 #include <map>
 #include <deque>
+#include <vector>
 
 //MIPT-MIPS modules
 #include <types.h>
@@ -25,8 +26,8 @@ private:
     const unsigned tag_array_size_;
     uint64** const tag_arrays_;
     std::deque< unsigned short>* LRU_data_;
-
-    const static unsigned MAX_LRU_DATA_SIZE_ = 2048;
+    std::vector< bool> LRU_data_fully_;
+    unsigned num_of_1s_LRU_fully_;
 
     const unsigned short offset_width_;
     const unsigned short set_width_;
@@ -40,8 +41,8 @@ private:
 
     void deleteWayFromSetNotFully( unsigned short way, uint64 set);
     void addWayToSetNotFully( unsigned short way, uint64 set);
-    void deleteTagFromLRUFully( unsigned tag_place);
     void addTagToLRUFully( unsigned tag_place);
+    unsigned getTagPlaceFully() const;
 
     bool read_fully( uint64 addr);
     bool read_not_fully( uint64 addr);
