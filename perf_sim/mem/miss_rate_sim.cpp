@@ -92,10 +92,16 @@ int main( int argc, char** argv)
             mem_trace.close();
 
             double prob = 1 - ( double)right_times / times;
-            out_file << prob << ",";
-
             std::chrono::duration< double> elapsed_secs = end-start;
-            time_data << elapsed_secs.count() << ",";
+            out_file << prob;
+            time_data << elapsed_secs.count();
+            if ( size_in_bytes != 1024*kilo)
+            {
+                out_file << ",";
+                time_data << ",";
+            }
+
+
         }
         out_file << std::endl;
         time_data << std::endl;
