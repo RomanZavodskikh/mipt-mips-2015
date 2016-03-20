@@ -53,9 +53,9 @@ CacheTagArray::CacheTagArray( unsigned size_in_bytes,
 
 CacheTagArray::~CacheTagArray()
 {
-    if ( fully_)
+    if ( !fully_)
     {
-        delete LRU_data_;
+        delete [] LRU_data_;
     }
     for( unsigned way = 0; way < ways_; ++way)
     {
